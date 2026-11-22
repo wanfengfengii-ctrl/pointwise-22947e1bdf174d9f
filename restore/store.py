@@ -37,6 +37,13 @@ CREATE TABLE IF NOT EXISTS restore_receipts (
     restore_id TEXT PRIMARY KEY REFERENCES restore_runs(restore_id),
     content_identity TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS row_reviews (
+    review_id TEXT PRIMARY KEY,
+    day TEXT NOT NULL,
+    before_receive_id TEXT NOT NULL REFERENCES received_packages(receive_id),
+    after_receive_id TEXT NOT NULL REFERENCES received_packages(receive_id),
+    result_json TEXT NOT NULL
+);
 COMMIT;
 '''
 

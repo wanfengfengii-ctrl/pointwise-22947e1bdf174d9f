@@ -38,6 +38,9 @@
 | `restore.read_received_package(db, receive_id)` | 读回固定实收版本。 |
 | `restore.restore_day(db, receive_id, target, restore_id)` | 核账并签存 `RestoredDay`。同一恢复号与原实收号、目标可复领，绑定变化拒绝。 |
 | `restore.read_day(db, restore_id)` | 按指定恢复号读取原 `RestoredDay`，含 `reconciliation` 和 `receipt`。 |
+| `inventory.freeze(..., row_evidence=True)` / `issue.issue_pack(..., row_evidence=True)` | 办理带行级证据的 V2 盘点与发行，见 ROW_REVIEW.md。 |
+| `restore.review_rows(db, before_receive_id, after_receive_id, review_id)` | 按两份同日 V2 实收件签存逐行复核。 |
+| `restore.read_row_review(db, review_id)` | 按复核号读取已签复核。 |
 
 读取未知号返回 `None`。输入、身份或核账错误以 `ValueError` 报告，数据库拒绝则保留 SQLite 错误。被拒绝的点收、更正、发行或签存不会留下部分成果。隔离仓允许先登记外层正确的交班件，再在恢复时核对正文的业务完整性。
 

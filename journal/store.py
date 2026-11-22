@@ -58,7 +58,8 @@ CREATE TABLE IF NOT EXISTS inventories (
     cut INTEGER NOT NULL CHECK (cut >= 0),
     rows INTEGER NOT NULL CHECK (rows >= 0),
     litres TEXT NOT NULL,
-    origin TEXT NOT NULL
+    origin TEXT NOT NULL,
+    evidence_json TEXT
 );
 CREATE TABLE IF NOT EXISTS issued_packages (
     issue_id TEXT PRIMARY KEY,
@@ -72,12 +73,20 @@ COMMIT;
 '''
 
 
+def _upgrade(db: sqlite3.Connection) -> None:
+    """Add columns introduced after the original schema, keeping old data."""
+    columns = {row[1] for row in db.execute('PRAGMA table_info(inventories)')}
+    if 'evidence_json' not in columns:
+        db.execute('ALTER TABLE inventories ADD COLUMN evidence_json TEXT')
+
+
 def initialize_source(db: sqlite3.Connection) -> None:
     if db.in_transaction:
         raise ValueError('source initialization requires an idle connection')
     db.execute('PRAGMA foreign_keys = ON')
     try:
         db.executescript(_SOURCE_SCHEMA)
+        _upgrade(db)
     except BaseException:
         db.rollback()
         raise

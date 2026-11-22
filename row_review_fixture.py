@@ -7,7 +7,9 @@ from intake import BatchRequest, ReadingInput, submit
 from inventory import freeze
 from issue import IssuedPackage, issue_pack
 from journal import correct_litres, initialize_source, read_current_revision, transfer
-from restore import initialize_isolated, receive_pack, restore_day
+from restore import (
+    initialize_isolated, receive_pack, restore_day, review_rows,
+)
 
 DAY = "2026-04-12"
 BATCH = "station"
@@ -86,6 +88,50 @@ def main():
         raise SystemExit("unexpected V1 fixture results")
     print(json.dumps({"same_v1_endpoint_bytes": equal_bytes, "restored": moved_figures,
                       "transfers": moved_rows, "corrections": corrected_rows}, sort_keys=True))
+    run_v2(True)
+    run_v2(False)
+
+
+def run_v2(exchange):
+    """Build the same inputs as V2 and review both rows end to end."""
+    with closing(sqlite3.connect(":memory:")) as source:
+        deliveries = build(
+            source, exchange,
+            freeze_count=lambda *args: freeze(*args, row_evidence=True),
+            issue_delivery=lambda *args: issue_pack(*args, row_evidence=True),
+        )
+        final = {row.line_id: [row.zone, row.litres, row.revision] for row in (
+            read_current_revision(source, DAY, BATCH, "a"),
+            read_current_revision(source, DAY, BATCH, "b"),
+        )}
+    initial = {"a": ["east", 5, 1], "b": ["west", 5, 1]}
+    reviews = {}
+    with closing(sqlite3.connect(":memory:")) as isolated:
+        initialize_isolated(isolated)
+        for name in ("before", "after", "staggered", "alternate"):
+            receive_pack(isolated, name, getattr(deliveries, name).raw)
+        for before, after, review_id in (("before", "after", "end"),
+                                         ("before", "staggered", "middle"),
+                                         ("before", "alternate", "spare")):
+            review = review_rows(isolated, before, after, review_id)
+            reviews[review_id] = [[row["line_id"],
+                                   row["before"] and [row["before"]["zone"],
+                                                      row["before"]["litres"],
+                                                      row["before"]["revision"]],
+                                   [row["after"]["zone"], row["after"]["litres"],
+                                    row["after"]["revision"]],
+                                   row["changes"]] for row in review["rows"]]
+    expected_changes = ["moved"] if exchange else ["same"]
+    expected = [[line_id, initial[line_id], final[line_id], expected_changes]
+                for line_id in ("a", "b")]
+    for review_id in ("end", "middle", "spare"):
+        if reviews[review_id] != expected:
+            raise SystemExit("unexpected V2 row review " + json.dumps(
+                {"review_id": review_id, "actual": reviews[review_id]}, sort_keys=True))
+    middle = reviews["middle"]
+    if middle[0][1][0] != "east" or middle[1][1][0] != "west":
+        raise SystemExit("unexpected staggered evidence " + json.dumps(middle))
+    print(json.dumps({"v2_endpoint_rows": expected, "reviews": reviews}, sort_keys=True))
 
 
 if __name__ == "__main__":

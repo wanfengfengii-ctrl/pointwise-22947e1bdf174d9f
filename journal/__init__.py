@@ -3,6 +3,8 @@ from .balances import balance_at_cut as balance_at_cut
 from .corrections import correct_litres as correct_litres
 from .postings import Posting as Posting
 from .postings import ZoneEffect as ZoneEffect
+from .replay import RowSnapshot as RowSnapshot
+from .replay import row_states_at_cut as row_states_at_cut
 from .postings import read_postings as read_postings
 from .revisions import ObservationRevision as ObservationRevision
 from .revisions import read_current_revision as read_current_revision
